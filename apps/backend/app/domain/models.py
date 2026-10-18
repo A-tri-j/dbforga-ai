@@ -116,3 +116,25 @@ class LearningProgress(Base):
     completed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
+class AuditEvent(Base):
+    __tablename__ = "audit_events"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    event: Mapped[str] = mapped_column(String(40))
+    detail: Mapped[str] = mapped_column(String(255), default="")
+    ip: Mapped[str | None] = mapped_column(String(45), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class UserSecurity(Base):
+    __tablename__ = "user_security"
+
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    force_read_only: Mapped[bool] = mapped_column(Boolean, default=False)
+    block_destructive: Mapped[bool] = mapped_column(Boolean, default=False)
+    query_timeout_seconds: Mapped[int] = mapped_column(Integer, default=30)
+    max_rows: Mapped[int] = mapped_column(Integer, default=5000)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+

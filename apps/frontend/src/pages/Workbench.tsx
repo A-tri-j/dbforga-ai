@@ -10,7 +10,7 @@ import PdfImportDialog from "../components/PdfImportDialog";
 import ReplyView from "../components/ReplyView";
 import ResultGrid from "../components/ResultGrid";
 import {
-  aiChat, cancelQuery, createSavedQuery, executeQuery, getGraph, getSchemas, listConnections, listProviders,
+  aiChat, cancelQuery, createSavedQuery, executeQuery, getGraph, getSchemas, getSecurity, listConnections, listProviders,
   type Connection, type ExecuteResult, type Graph, type PdfConfirmResult, type ProviderStatus,
 } from "../lib/api";
 import { splitStatements, statementAt } from "../lib/sqlSplit";
@@ -59,6 +59,10 @@ export default function Workbench() {
   const [schema, setSchema] = useState("");
   const [dialect, setDialect] = useState<Dialect>("postgresql");
   const [readOnly, setReadOnly] = useState(true);
+  const [locked, setLocked] = useState(false);
+  useEffect(() => {
+    getSecurity().then((s) => { setLocked(s.force_read_only); if (s.force_read_only) setReadOnly(true); }).catch(() => undefined);
+  }, []);
   const [providers, setProviders] = useState<ProviderStatus[]>([]);
   const [prompt, setPrompt] = useState("");
   const [generating, setGenerating] = useState(false);
@@ -429,8 +433,8 @@ export default function Workbench() {
           <option value="mysql">MySQL</option>
           <option value="mongodb">MongoDB</option>
         </select>
-        <label className="flex items-center gap-1.5 text-sm text-slate-300">
-          <input type="checkbox" checked={readOnly} onChange={(e) => setReadOnly(e.target.checked)} /> Read-only
+        <label className="flex items-center gap-1.5 text-sm text-slate-300" title={locked ? "Locked by your security settings" : ""}>
+          <input type="checkbox" checked={readOnly} disabled={locked} onChange={(e) => setReadOnly(e.target.checked)} /> Read-only{locked ? " (locked)" : ""}
         </label>
         <div className="ml-auto flex flex-wrap items-center gap-2">
           {saveName === null ? (

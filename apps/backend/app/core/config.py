@@ -19,6 +19,12 @@ class Settings(BaseSettings):
     max_upload_mb: int = 20
     max_import_rows: int = 100_000
 
+    env: str = "development"        # "production" turns on the strict startup checks
+    log_level: str = "INFO"
+    trust_proxy: bool = False       # true behind Render/Vercel proxies, so the real client IP is used
+    rate_limit_enabled: bool = True
+    allow_registration: bool = True
+
 
     model_config = SettingsConfigDict(env_file=".env", env_prefix="DBFORGE_")
 

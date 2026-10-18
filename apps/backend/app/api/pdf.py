@@ -13,6 +13,8 @@ from app.api.schemas import (
 from app.core.config import settings
 from app.core.db import get_db
 from app.domain.models import DbConnection, User
+from app.api.ratelimit import limit_user
+from app.api.policy import require_writable
 from app.services import importer, introspection, pdf_tables
 from app.services.connections import friendly_error, get_engine
 
@@ -21,7 +23,7 @@ router = APIRouter(prefix="/pdf", tags=["pdf"])
 XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
 
-@router.post("/extract", response_model=PdfExtractOut)
+@router.post("/extract", response_model=PdfExtractOut, dependencies=[Depends(limit_user("upload", 20, 600))])
 async def extract(file: UploadFile, user: User = Depends(get_current_user)):
     limit = settings.max_upload_mb * 1024 * 1024
     data = await file.read(limit + 1)
@@ -53,6 +55,7 @@ def preview(body: PdfTableIn, user: User = Depends(get_current_user)):
 def confirm(body: PdfConfirmIn, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     if not body.confirm:
         raise HTTPException(status_code=400, detail="Confirmation is required before writing to the database")
+    require_writable(db, user.id, "PDF import")
     row = db.get(DbConnection, body.connection_id)
     if row is None or row.user_id != user.id:
         raise HTTPException(status_code=404, detail="Connection not found")

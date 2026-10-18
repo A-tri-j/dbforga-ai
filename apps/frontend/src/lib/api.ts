@@ -516,3 +516,17 @@ export async function downloadExport() {
   URL.revokeObjectURL(url);
 }
 
+export type SecuritySettings = {
+  force_read_only: boolean;
+  block_destructive: boolean;
+  query_timeout_seconds: number;
+  max_rows: number;
+};
+export type AuditItem = { id: number; event: string; detail: string; ip: string | null; created_at: string };
+
+export const getSecurity = () => request<SecuritySettings>("/account/security");
+export const saveSecurity = (s: SecuritySettings & { password: string | null }) =>
+  request<SecuritySettings>("/account/security", { method: "PUT", body: JSON.stringify(s) });
+export const getAudit = (offset = 0, limit = 50) =>
+  request<AuditItem[]>(`/account/audit?limit=${limit}&offset=${offset}`);
+

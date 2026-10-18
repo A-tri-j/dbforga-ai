@@ -13,6 +13,7 @@ from app.core.config import settings
 from app.core.crypto import decrypt, encrypt
 from app.core.db import get_db
 from app.domain.models import DbConnection, QueryHistory, SavedQuery, SchemaSnapshot, User
+from app.api.ratelimit import limit_user
 from app.adapters import mongo as mongo_adapter
 from app.services import introspection, mongo_tools
 from app.services.connections import drop_engine, friendly_error, get_engine, get_mongo_client, params_from_row
@@ -34,7 +35,7 @@ def _owned(db: Session, user: User, connection_id: int) -> DbConnection:
     return row
 
 
-@router.post("/test", response_model=TestResult)
+@router.post("/test", response_model=TestResult, dependencies=[Depends(limit_user("conn-test", 30, 60))])
 def test(body: ConnectionTestIn, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     password = body.password
     if not password and body.connection_id is not None:
@@ -52,7 +53,7 @@ def test(body: ConnectionTestIn, user: User = Depends(get_current_user), db: Ses
     return TestResult(ok=True, message="Connection successful", server_version=version)
 
 
-@router.get("/detect-local", response_model=DetectOut)
+@router.get("/detect-local", response_model=DetectOut, dependencies=[Depends(limit_user("detect", 20, 60))])
 def detect_local(user: User = Depends(get_current_user)):
     """Only checks whether a database port is open on this computer. It does not try any login."""
     if not settings.allow_private_hosts:
@@ -108,7 +109,7 @@ def list_connections(user: User = Depends(get_current_user), db: Session = Depen
     return db.scalars(stmt).all()
 
 
-@router.post("", response_model=ConnectionOut, status_code=201)
+@router.post("", response_model=ConnectionOut, status_code=201, dependencies=[Depends(limit_user("conn-test", 30, 60))])
 def create_connection(body: ConnectionIn, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     try:
         test_connection(_params(body))

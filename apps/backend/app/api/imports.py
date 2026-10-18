@@ -6,6 +6,8 @@ from app.api.schemas import ImportExecuteIn, ImportOut, ImportReport, ProfileOut
 from app.core.config import settings
 from app.core.db import get_db
 from app.domain.models import DbConnection, User
+from app.api.ratelimit import limit_user
+from app.api.policy import load_policy, require_writable
 from app.services import importer, introspection
 from app.services.connections import friendly_error, get_engine
 
@@ -19,7 +21,7 @@ def _meta(import_id: str, user: User) -> importer.ImportMeta:
     return meta
 
 
-@router.post("", response_model=ImportOut, status_code=201)
+@router.post("", response_model=ImportOut, status_code=201, dependencies=[Depends(limit_user("upload", 20, 600))])
 async def upload(file: UploadFile, user: User = Depends(get_current_user)):
     limit = settings.max_upload_mb * 1024 * 1024
     data = await file.read(limit + 1)
@@ -50,6 +52,7 @@ def profile(import_id: str, sheet: str | None = None, user: User = Depends(get_c
 def execute(import_id: str, body: ImportExecuteIn, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     if not body.confirm:
         raise HTTPException(status_code=400, detail="Confirmation is required before writing to the database")
+    require_writable(db, user.id, "File import")
     meta = _meta(import_id, user)
     row = db.get(DbConnection, body.connection_id)
     if row is None or row.user_id != user.id:

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import SecurityCard from "../components/SecurityCard";
 import {
   getProviderModels, listProviders, removeKey, saveKey, setDefaultProvider, validateKey,
   type ProviderStatus,
@@ -120,6 +121,10 @@ export default function Settings() {
         {loading && <p className="text-sm text-slate-400">Loading...</p>}
         {error && <p className="text-sm text-red-400">{error}</p>}
         {providers.map((p) => <ProviderCard key={`${p.provider}-${p.model}-${p.configured}`} status={p} onChanged={load} />)}
+      </section>
+      <section className="space-y-3">
+        <h2 className="text-lg font-medium">Security</h2>
+        <SecurityCard />
       </section>
     </div>
   );

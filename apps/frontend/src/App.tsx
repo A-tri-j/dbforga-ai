@@ -1,6 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AuthProvider } from "./auth/AuthContext";
 import Layout from "./components/Layout";
+import Activity from "./pages/Activity";
 import AiAssistant from "./pages/AiAssistant";
 import Dashboard from "./pages/Dashboard";
 import Databases from "./pages/Databases";
@@ -40,6 +41,7 @@ export default function App() {
             <Route path="/docs/:slug" element={<Docs />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/storage" element={<DataStorage />} />
+            <Route path="/activity" element={<Activity />} />
           </Route>
         </Routes>
       </AuthProvider>

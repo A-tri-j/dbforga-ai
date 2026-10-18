@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
+from app.api.policy import load_policy, require_writable
 from app.api.schemas import AnalyzeIn, AnalyzeOut, CreateIndexIn, CreateIndexOut
 from app.core.db import get_db
 from app.domain.models import DbConnection, User
@@ -38,7 +39,7 @@ def analyze(connection_id: int, body: AnalyzeIn, user: User = Depends(get_curren
         result = query_runner.run_statement(
             engine=engine, db_kind=row.engine, user_id=user.id, query_id=body.query_id,
             sql=perf_analyzer.explain_sql(row.engine, stmt, body.execute),
-            read_only=True, max_rows=100, timeout_s=body.timeout_seconds,
+            read_only=True, max_rows=100, timeout_s=min(body.timeout_seconds, load_policy(db, user.id).query_timeout_seconds),
         )
     except HTTPException:
         raise
@@ -68,6 +69,7 @@ def analyze(connection_id: int, body: AnalyzeIn, user: User = Depends(get_curren
 def create_index(connection_id: int, body: CreateIndexIn, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     if not body.confirm:
         raise HTTPException(status_code=400, detail="Confirmation is required before creating an index")
+    require_writable(db, user.id, "Index creation")
     row = _owned(db, user, connection_id)
     try:
         engine = get_engine(row)

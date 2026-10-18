@@ -1,7 +1,7 @@
 import { NavLink } from "react-router-dom";
 import {
   BookOpen, Bot, Database, FolderKanban, Gauge, GitCompare, GraduationCap, HardDrive, History as HistoryIcon, Home,
-  LogOut, Monitor, Moon, Network, Settings, Sun, Terminal, Upload, type LucideIcon,
+  LogOut, Monitor, Moon, Network, ScrollText, Settings, Sun, Terminal, Upload, type LucideIcon,
 } from "lucide-react";
 import { useAuth } from "../auth/AuthContext";
 import { useTheme, type ThemePref } from "../lib/theme";
@@ -38,6 +38,7 @@ const groups: { title: string; items: Item[] }[] = [
   {
     title: "System",
     items: [
+      { to: "/activity", label: "Activity", icon: ScrollText },
       { to: "/docs", label: "Docs & Tutorials", icon: BookOpen },
       { to: "/storage", label: "My Data", icon: HardDrive },
       { to: "/settings", label: "Settings", icon: Settings },

@@ -513,3 +513,27 @@ class PdfConfirmOut(BaseModel):
     xlsx_import_id: str | None
     table_name: str
     queries: list[StarterQuery]
+
+
+class SecurityOut(BaseModel):
+    force_read_only: bool
+    block_destructive: bool
+    query_timeout_seconds: int
+    max_rows: int
+
+
+class SecurityIn(BaseModel):
+    force_read_only: bool
+    block_destructive: bool
+    query_timeout_seconds: int = Field(ge=5, le=120)
+    max_rows: int = Field(ge=100, le=10000)
+    password: str | None = Field(default=None, max_length=72)  # needed only to relax a protection
+
+
+class AuditOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    event: str
+    detail: str
+    ip: str | None
+    created_at: datetime

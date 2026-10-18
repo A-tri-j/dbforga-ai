@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 from sqlalchemy import func, select
@@ -9,12 +9,17 @@ from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
-from app.api.schemas import StorageOut
+from app.api.policy import load_policy
+from app.api.ratelimit import client_ip, enforce
+from app.api.schemas import AuditOut, SecurityIn, SecurityOut, StorageOut
 from app.core.config import settings
 from app.core.db import get_db
+from app.core.security import verify_password
 from app.domain.models import (
-    AiProviderKey, DbConnection, LearningProgress, Project, QueryHistory, SavedQuery, SchemaSnapshot, User,
+    AiProviderKey, AuditEvent, DbConnection, LearningProgress, Project, QueryHistory, SavedQuery,
+    SchemaSnapshot, User, UserSecurity,
 )
+from app.services import audit
 
 router = APIRouter(prefix="/account", tags=["account"])
 
@@ -81,3 +86,50 @@ def export(user: User = Depends(get_current_user), db: Session = Depends(get_db)
         content=jsonable_encoder(data),
         headers={"Content-Disposition": 'attachment; filename="dbforge-export.json"'},
     )
+
+
+@router.get("/security", response_model=SecurityOut)
+def get_security(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    p = load_policy(db, user.id)
+    return SecurityOut(force_read_only=p.force_read_only, block_destructive=p.block_destructive,
+                       query_timeout_seconds=p.query_timeout_seconds, max_rows=p.max_rows)
+
+
+@router.put("/security", response_model=SecurityOut)
+def save_security(body: SecurityIn, request: Request, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    ip = client_ip(request)
+    current = load_policy(db, user.id)
+    relaxes = (
+        (current.force_read_only and not body.force_read_only)
+        or (current.block_destructive and not body.block_destructive)
+        or body.query_timeout_seconds > current.query_timeout_seconds
+        or body.max_rows > current.max_rows
+    )
+    if relaxes:
+        enforce(f"security-password:{user.id}", 5, 600)  # limits password guessing
+        if not body.password or not verify_password(body.password, user.password_hash):
+            audit.record(db, user.id, "security.denied", "wrong password while relaxing a protection", ip)
+            raise HTTPException(status_code=403, detail="Enter your current password to relax a protection")
+
+    row = db.get(UserSecurity, user.id) or UserSecurity(user_id=user.id)
+    row.force_read_only = body.force_read_only
+    row.block_destructive = body.block_destructive
+    row.query_timeout_seconds = body.query_timeout_seconds
+    row.max_rows = body.max_rows
+    db.add(row)
+    db.commit()
+    audit.record(
+        db, user.id, "security.update",
+        f"read_only={body.force_read_only} block_destructive={body.block_destructive} "
+        f"timeout={body.query_timeout_seconds}s max_rows={body.max_rows}", ip,
+    )
+    return SecurityOut(force_read_only=body.force_read_only, block_destructive=body.block_destructive,
+                       query_timeout_seconds=body.query_timeout_seconds, max_rows=body.max_rows)
+
+
+@router.get("/audit", response_model=list[AuditOut])
+def get_audit(limit: int = Query(50, ge=1, le=200), offset: int = Query(0, ge=0),
+              user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    stmt = (select(AuditEvent).where(AuditEvent.user_id == user.id)
+            .order_by(AuditEvent.id.desc()).limit(limit).offset(offset))
+    return db.scalars(stmt).all()

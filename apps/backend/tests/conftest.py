@@ -7,9 +7,11 @@ from cryptography.fernet import Fernet
 # Must be set before the app is imported so tests never touch your dev database.
 _tmp = tempfile.mkdtemp()
 os.environ["DBFORGE_DATABASE_URL"] = f"sqlite:///{_tmp}/test.db"
-os.environ["DBFORGE_JWT_SECRET"] = "test-secret-not-for-production"
+os.environ["DBFORGE_JWT_SECRET"] = "test-secret-not-for-production-min-32-chars"
 os.environ["DBFORGE_ALLOW_PRIVATE_HOSTS"] = "false"
 os.environ["DBFORGE_APP_MODE"] = "web"
+os.environ["DBFORGE_RATE_LIMIT_ENABLED"] = "false"
+os.environ["DBFORGE_ENV"] = "development"
 os.environ["DBFORGE_ENCRYPTION_KEY"] = Fernet.generate_key().decode()
 
 import pytest  # noqa: E402

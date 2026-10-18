@@ -11,6 +11,7 @@ from app.api.schemas import (
 from app.core.crypto import decrypt, encrypt
 from app.core.db import get_db
 from app.domain.models import AiProviderKey, DbConnection, User
+from app.api.ratelimit import limit_user
 from app.services import ai_assistant, mongo_tools, schema_tools
 from app.services.connections import friendly_error, get_engine, get_mongo_client
 
@@ -48,7 +49,7 @@ def providers(user: User = Depends(get_current_user), db: Session = Depends(get_
     return [_status(p, _row(db, user, p)) for p in PROVIDERS]
 
 
-@router.post("/validate", response_model=ValidateOut)
+@router.post("/validate", response_model=ValidateOut, dependencies=[Depends(limit_user("ai-validate", 20, 60))])
 def validate(body: ValidateIn, user: User = Depends(get_current_user)):
     try:
         models = ai_providers.list_models(body.provider, body.api_key.strip())
@@ -131,7 +132,7 @@ def remove_key(provider: ProviderName, user: User = Depends(get_current_user), d
     return Response(status_code=204)
 
 
-@router.post("/chat", response_model=ChatOut)
+@router.post("/chat", response_model=ChatOut, dependencies=[Depends(limit_user("ai-chat", 30, 60))])
 def chat(body: ChatIn, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     if body.provider:
         row = _row(db, user, body.provider)
